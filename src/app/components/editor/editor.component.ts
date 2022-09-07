@@ -2,11 +2,19 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  OnDestroy,
   OnInit,
   ViewChild,
 } from '@angular/core';
 import { registerPlainText } from '@lexical/plain-text';
-import { createEditor, LexicalEditor } from 'lexical';
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+  $getSelection,
+  createEditor,
+  LexicalEditor,
+} from 'lexical';
 
 const initialEditorState = JSON.stringify({
   root: {
@@ -43,16 +51,27 @@ const initialEditorState = JSON.stringify({
   templateUrl: './editor.component.html',
   styleUrls: ['./editor.component.css'],
 })
-export class EditorComponent implements OnInit, AfterViewInit {
+export class EditorComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('editor')
   private editableElement: ElementRef<HTMLElement | null>;
-
   private editor: LexicalEditor;
+  private removeUpdateListener: () => void;
 
   ngOnInit() {
     this.editor = createEditor();
     const parsedEditorState = this.editor.parseEditorState(initialEditorState);
     this.editor.setEditorState(parsedEditorState);
+
+    // listen
+    this.removeUpdateListener = this.editor.registerUpdateListener(
+      ({ editorState }) => {
+        editorState.read(() => {
+          // Get the selection from the EditorState
+          const selection = $getSelection();
+          console.log('Selection is %o', selection);
+        });
+      }
+    );
   }
 
   ngAfterViewInit() {
@@ -60,7 +79,25 @@ export class EditorComponent implements OnInit, AfterViewInit {
     registerPlainText(this.editor);
   }
 
-  onButtonPress() {
-    console.log(JSON.stringify(this.editor.getEditorState()));
+  ngOnDestroy() {
+    this.removeUpdateListener();
+  }
+
+  logState() {
+    console.log(this.editor.getEditorState());
+  }
+
+  appendHelloWorld() {
+    this.editor.update(() => {
+      // Get the RootNode from the EditorState
+      const root = $getRoot();
+      // Create a new ParagraphNode
+      const paragraphNode = $createParagraphNode();
+      // Create a new TextNode
+      const textNode = $createTextNode('Hello world');
+
+      paragraphNode.append(textNode);
+      root.append(paragraphNode);
+    });
   }
 }
